@@ -256,14 +256,3 @@ citycores <- replace(cities, !(cities %in% unique(subset(cities, cores > 0))), 0
 write_foo(citycores, 'cc', reference, params)
 
 toc()
-
-# # Testing -----------------------------------------------------------------
-# setwd('~/Dropbox/research/delineation_public')
-# params <- modifyList(params, list(
-#   density   = 'input/density.tif',
-#   unlivable = 'input/unlivable.tif',
-#   outdir    = 'output',
-#   tmpdir    = '~/Desktop/tmp',
-#   nboots    = 1000))
-# cat(paste0(c("Rscript", "~/Dropbox/research/delineation_public/delineation.R", paste0("--", names(params), "=", params)), collapse  =  " "))
-# -------------------------------------------------------------------------
