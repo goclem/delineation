@@ -2,9 +2,9 @@
 
 **Reference**: De Bellefon M.P., Combes P.P., Duranton G., Gobillon L. and Gorin C., 2019. Delineating urban areas using building density, *Journal of Urban Economics*.
 
-**Contact:** gorinclem@gmail.com
+**Contact**: Clément Gorin, gorinclem@gmail.com
 
-**Description:** This note contains the guidelines to run the script `delineation.R` that computes urban delineations as described in the reference above. The script is a R executable that can be used either interactively, from the command line or in batch mode. The script produces the following delineations.
+**Description**: This note contains the guidelines to run the script `delineation.R` that computes urban delineations as described in the reference above. The script is a R executable that can be used either interactively, from the command line or in batch mode. The script produces the following delineations.
 
 1. Urban areas
 2. Urban cores
