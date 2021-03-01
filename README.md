@@ -26,9 +26,9 @@ Parameters | Description | Type | Default
 `bandwidth` | Bandwidth (diameter) of the bi-squared smoothing kernel expressed in pixels. This value should depend on the resoltuion of the input rasters. | Integer | `15`
 `quantile` | Cut-off percentile for the counterfacual distributions above which the density is considered to be significantly above randomness. | Integer | `95`
 `replace` | Controls whether the bootstrap for counterfactual densities is performed with (`1`) or without (`0`) replacement. | Integer | `1`
-`joinall` | Attributes the same identifier to distant delineations that are up to `[parameter value]` pixels apart using 8 connectivity. | Integer | `1`
-`joinunl` | Attributes the same identifier to distant delineations that are up to `[parameter value]` unlivable pixels apart using 8 connectivity. | Integer | `2`
-`filter` | Removes the delineations whose number of pixels is smaller than or equal to the parameter value. | Integer | `1`
+`joinall` | Attributes the same identifier to distant delineations that are up to `[parameter value]` pixels apart using 8 connectivity. | Integer | `0`
+`joinunl` | Attributes the same identifier to distant delineations that are up to `[parameter value]` unlivable pixels apart using 8 connectivity. | Integer | `0`
+`filter` | Removes the delineations whose number of pixels is smaller than or equal to the parameter value. | Integer | `0`
 `workers` | Number of core used for parallel computing. The value `-1` indicates all cores save one. Values exceeding the available cores are collapsed to `-1`. | Integer | `-1`
 `memory` | Amount of memory used for the computations. The value `-1` indicates all available memory. Values exceeding the available memory are collapsed to `-1`. | Integer |  `-1`
 `seed` | Bootstrap seed for reproducibility.  L’Ecuyer seeds are used to ensure that the bootstraps performed in parallel are independent. | Integer | `1`

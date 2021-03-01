@@ -1,7 +1,8 @@
 #!/usr/bin/env Rscript
 # Description: Computes urban delineations
-# Author: Clement Gorin, gorin@gate.cnrs.fr
-# Date: January 2021
+# Author: Clement Gorin
+# Contact: gorinclem@gmail.com
+# Date: 25 January 2021
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
@@ -10,18 +11,18 @@ options(warn = -1)
 
 # Parameters
 arguments <- list(
-  make_option('--density',   type = 'character', default = '',  help = 'Path to input raster.'),
-  make_option('--unlivable', type = 'character', default = '',  help = 'Path to unlivable raster.'),
-  make_option('--outdir',    type = 'character', default = '',  help = 'Path to output directory.'),
-  make_option('--tmpdir',    type = 'character', default = '',  help = 'Path to temporary directory.'),
-  make_option('--nboots',    type = 'integer',   default = 100, help = 'Number of bootstraps (default 100).'),
-  make_option('--bandwidth', type = 'integer',   default = 15,  help = 'Kernel bandwidth in pixels (default 15).'),
-  make_option('--quantile',  type = 'integer',   default = 95,  help = 'Quantile for threshold (default 95).'),
-  make_option('--replace',   type = 'integer',   default = 1,   help = 'Bootstrap with replacement (default 1).'),
-  make_option('--joinall',   type = 'integer',   default = 1,   help = 'Joins distant delineations:\n 0: None\n 1: Joins delineations one pixel appart (default)\n 2: 1 and joins delineations up to two non-buildable pixels appart'),
-  make_option('--joinunl',   type = 'integer',   default = 2,   help = 'Joins distant delineations:\n 0: None\n 1: Joins delineations one pixel appart (default)\n 2: 1 and joins delineations up to two non-buildable pixels appart'),
-  make_option('--filter',    type = 'integer',   default = 1,   help = 'Removes delineations that are smaller than specified value (default 1)'),
-  make_option('--workers',   type = 'integer',   default = -1,  help = 'Available cores (default -1 for all cores)'),
+  make_option('--density',   type = 'character', default = '',  help = 'Path to density raster'),
+  make_option('--unlivable', type = 'character', default = '',  help = 'Path to unlivable raster'),
+  make_option('--outdir',    type = 'character', default = '',  help = 'Path to output directory'),
+  make_option('--tmpdir',    type = 'character', default = '',  help = 'Path to temporary directory'),
+  make_option('--nboots',    type = 'integer',   default = 100, help = 'Number of bootstrapped counterfactual densities (default 100)'),
+  make_option('--bandwidth', type = 'integer',   default = 15,  help = 'Kernel bandwidth in pixels (default 15)'),
+  make_option('--quantile',  type = 'integer',   default = 95,  help = 'Quantile for threshold (default 95)'),
+  make_option('--replace',   type = 'integer',   default = 1,   help = 'Bootstrap with replacement (default 1)'),
+  make_option('--joinall',   type = 'integer',   default = 0,   help = 'Joins delineations up to [value] pixels apart (default 0)'),
+  make_option('--joinunl',   type = 'integer',   default = 0,   help = 'Joins delineations up to [value] unlivable pixels apart (default 0)'),
+  make_option('--filter',    type = 'integer',   default = 0,   help = 'Keeps delineations that are larger than [value] pixels (default 0)'),
+  make_option('--workers',   type = 'integer',   default = -1,  help = 'Number of available cores (default -1 for all cores)'),
   make_option('--memory',    type = 'integer',   default = -1,  help = 'Available memory in GB (default -1 for all memory)'),
   make_option('--seed',      type = 'integer',   default = 1,   help = 'Bootstrap seed (default 1)')
 )
@@ -63,7 +64,7 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations (version 22/01/04)\n')
+cat('\nComputes urban delineations (version 21-01-25)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
@@ -104,9 +105,9 @@ write_foo <- cmpfun(function(delineation, label, reference, params) {
 })
 
 # Optimises computations
-optimise_foo <- cmpfun(function(livable, params) {
+optimise_foo <- cmpfun(function(livable, params, memshr = 0.1) {
   bootsize   <- 8 * sum(livable) / 1024^3
-  sliceindex <- ceiling(bootsize * params$nboots / (0.1 * params$memory))
+  sliceindex <- ceiling(bootsize * params$nboots / (memshr * params$memory))
   sliceindex <- round(seq(0, sum(livable), length.out = sliceindex + 1))
   usedisk    <- as.integer(length(sliceindex) > 2)
   params     <- modifyList(params, list(sliceindex = sliceindex, usedisk = usedisk))
@@ -119,7 +120,7 @@ kernel_foo <- cmpfun(function(bandwidth) {
   kernel   <- matrix(0, size, size)
   centre   <- ceiling(size / 2)
   distance <- sqrt((col(kernel) - centre)^2 + (row(kernel) - centre)^2)
-  distance <- ifelse(distance <=  bandwidth / 2, (1 - (distance / bandwidth * 2)^2)^2, 0)
+  distance <- ifelse(distance <= bandwidth / 2, (1 - (distance / bandwidth * 2)^2)^2, 0)
   kernel   <- as.cimg(distance / sum(distance))
   return(kernel)
 })
@@ -184,7 +185,7 @@ delineation_foo <- cmpfun(function(density, livable, threshold, kernel) {
 # Computes ranks
 rank_foo <- cmpfun(function(identifier) {
     ids <- subset(identifier, identifier > 0)
-    rnk <- rank(-tabulate(ids), ties = "first")
+    rnk <- rank(-tabulate(ids), ties = 'first')
     rnk <- factor(ids, seq(max(ids)), rnk)
     rnk <- as.integer(levels(rnk))[rnk]
     identifier <- replace(identifier, identifier > 0, rnk)
@@ -214,7 +215,7 @@ identifier_foo <- cmpfun(function(delineation, livable, params) {
 
 tic('Runtime')
 
-# Cities data
+# Urban areas data
 cat('\n- Loading data')
 reference <- raster(raster(params$density))
 livable   <- read_foo(params$unlivable)
@@ -222,37 +223,37 @@ livable   <- replace(livable, px.na(livable), 1) == 0
 density   <- read_foo(params$density, livable)
 kernel    <- kernel_foo(params$bandwidth)
 
-# Cities computations
-cat("\n- Computing cities:")
-params      <- optimise_foo(livable, params)                       ; cat(" bootstraps...")
-bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(" thresholds...")
-threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(" delineations...")
-delineation <- delineation_foo(density, livable, threshold, kernel); cat(" identifiers")
-cities      <- identifier_foo(delineation, livable, params)
+# Urban areas computations
+cat('\n- Computing urban areas:')
+params      <- optimise_foo(livable, params)                       ; cat(' bootstraps...')
+bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(' thresholds...')
+threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(' delineations...')
+delineation <- delineation_foo(density, livable, threshold, kernel); cat(' identifiers')
+urban       <- identifier_foo(delineation, livable, params)
 write_foo(threshold, 'ut', reference, params)                                 
-write_foo(cities, 'ur', reference, params)
+write_foo(urban, 'ur', reference, params)
 unlink(dir(params$tmpdir, full.names = T), recursive = T)
 rm(bootstraps, threshold, delineation)
 
-# Cores data
-cat("\n- Computing cores: ")
-livable <- imsub(cities > 0)
+# Urban cores data
+cat('\n- Computing urban cores:')
+livable <- imsub(urban > 0)
 density <- replace(density, !livable, 0)
 
 # Core computations
-params      <- optimise_foo(livable, params)                       ; cat(" bootstraps...")
-bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(" thresholds...")
-threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(" delineations...")
-delineation <- delineation_foo(density, livable, threshold, kernel); cat(" identifiers")
-cores <- replace(cities, !delineation, 0)
+params      <- optimise_foo(livable, params)                       ; cat(' bootstraps...')
+bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(' thresholds...')
+threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(' delineations...')
+delineation <- delineation_foo(density, livable, threshold, kernel); cat(' identifiers')
+cores       <- replace(urban, !delineation, 0)
 write_foo(threshold, 'ct', reference, params)
 write_foo(cores, 'co', reference, params)
 unlink(params$tmpdir, recursive = T)
 rm(bootstraps, threshold, delineation)
 
-# Cities with cores computations
-cat('\n- Computing cities with cores\n\n')
-citycores <- replace(cities, !(cities %in% unique(subset(cities, cores > 0))), 0)
-write_foo(citycores, 'cc', reference, params)
+# Urban areas with cores computations
+cat('\n- Computing urban areas with cores\n\n')
+urbancores <- replace(urban, !(urban %in% unique(subset(urban, cores > 0))), 0)
+write_foo(urbancores, 'cc', reference, params)
 
 toc()
