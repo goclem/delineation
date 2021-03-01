@@ -50,7 +50,7 @@ pacman | 0.5.1 | Package management
 optparse | 1.6.6 | Argument management
 tictoc | 1.0.0 | Measures execution time
 
-## Examples
+## Usage
 
 The scripts can be executed from the Windows Command Prompt or the Linux or Mac Terminals using the commands below. By default, the `Rscript.exe` environment variable is not defined on Windows.
 
