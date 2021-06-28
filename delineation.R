@@ -2,12 +2,12 @@
 # Description: Computes urban delineations
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Date: 25 January 2021
+# Updated: 28 June 2021
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
-pacman::p_load(compiler, fst, future.apply, imager, memuse, optparse, raster, rgdal, tictoc)
-options(warn = -1)
+pacman::p_load(compiler, fst, future.apply, imager, matrixStats, memuse, optparse, raster, rgdal, tictoc)
+options(warn = -1, future.globals.maxSize = (2048 * 1024^2))
 
 # Parameters
 arguments <- list(
@@ -16,6 +16,7 @@ arguments <- list(
   make_option('--outdir',    type = 'character', default = '',  help = 'Path to output directory'),
   make_option('--tmpdir',    type = 'character', default = '',  help = 'Path to temporary directory'),
   make_option('--nboots',    type = 'integer',   default = 100, help = 'Number of bootstrapped counterfactual densities (default 100)'),
+  make_option('--niter',     type = 'integer',   default = 1,   help = 'Number of iteration for the cores (default 1)'),
   make_option('--bandwidth', type = 'integer',   default = 15,  help = 'Kernel bandwidth in pixels (default 15)'),
   make_option('--quantile',  type = 'integer',   default = 95,  help = 'Quantile for threshold (default 95)'),
   make_option('--replace',   type = 'integer',   default = 1,   help = 'Bootstrap with replacement (default 1)'),
@@ -30,6 +31,18 @@ arguments <- list(
 params <- parse_args(OptionParser(usage = 'Computes urban delineations', option_list = arguments))
 params <- subset(params, names(params) != 'help')
 
+# (!) Testing only --------------------------------------------------------
+# # Parameters
+# params <- modifyList(params, list(
+#   density   = 'input/density.tif',
+#   unlivable = 'input/unlivable.tif',
+#   outdir    = 'output',
+#   tmpdir    = 'temporary'
+#   ))
+# # Command line
+# cat(paste(c('Rscript', 'delineation.R', paste0('--', names(params), '=', params)), collapse =  ' '))
+# -------------------------------------------------------------------------
+
 # Checks directories
 if(!dir.exists(params$outdir)) dir.create(params$outdir)
 if(!dir.exists(params$tmpdir)) dir.create(params$tmpdir)
@@ -42,6 +55,7 @@ tests <- list(
   outdir    = file.exists, 
   tmpdir    = file.exists,
   nboots    = function(.) is_greater_than(., 0),
+  niter     = function(.) is_greater_than(., 0),
   bandwidth = function(.) is_greater_than(., 1),
   quantile  = function(.) is_in(., 0:100),
   replace   = function(.) is_in(., 0:1),
@@ -58,13 +72,13 @@ rm(arguments, tests)
 
 # Checks workers and memory
 maxcor <- availableCores() - 1
-maxmem <- Sys.meminfo()$totalram@size
+maxmem <- round(Sys.meminfo()$totalram@size)
 params$workers <- ifelse(params$workers == -1, maxcor, min(params$workers, maxcor))
 params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxmem))
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations (version 21-01-25)\n')
+cat('\nComputes urban delineations (version 21-04-26)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
@@ -82,12 +96,13 @@ display <- cmpfun(function(cimg, discrete = F) {
 
 # Reads raster as cimg
 read_foo <- cmpfun(function(file, livable = NULL) {
-  file <- raster(file)
-  file <- as.cimg(file, maxpixels = ncell(file))
+  image <- raster(file)
+  image <- as.cimg(image, maxpixels = ncell(image))
   if(!is.null(livable)) {
-    file <- replace(file, !livable, 0)
+    image <- pad(image, 2 * ceiling(params$bandwidth / 2), "xy")
+    image <- replace(image, !livable, 0)
   }
-  return(file)
+  return(image)
 })
 
 # Creates file names
@@ -98,10 +113,12 @@ filename_foo <- cmpfun(function(label, params) {
 })
 
 # Writes cimg as raster
-write_foo <- cmpfun(function(delineation, label, reference, params) {
-  delineation <- setValues(reference, c(delineation))
-  filename    <- filename_foo(label, params)
-  writeRaster(delineation, filename, NAflag = 0, overwrite = T)  
+write_foo <- cmpfun(function(image, label, reference, params, navalue = -1) {
+  image <- crop.borders(image, nPix = floor((params$bandwidth + 1) / 2))
+  image <- setValues(reference, c(image))
+  image <- mask(image, reference)
+  filename <- filename_foo(label, params)
+  writeRaster(image, filename, NAflag = navalue, overwrite = T)  
 })
 
 # Optimises computations
@@ -126,34 +143,27 @@ kernel_foo <- cmpfun(function(bandwidth) {
 })
 
 # Computes single bootstrap
-bootstrap_foo <- cmpfun(function(density, livable, kernel, params) {
+bootstrap_foo <- cmpfun(function(density, livable, rescale, kernel, params) {
   bootstrap <- replace(density, livable, sample(density[livable], replace = params$replace))
+  bootstrap <- replace(bootstrap, livable, bootstrap[livable] / rescale[livable])
   bootstrap <- convolve(bootstrap, kernel)
-  bootstrap <- bootstrap[livable]
+  bootstrap <- subset(bootstrap, livable)
   return(bootstrap)
 })
 
 # Computes multiple bootstraps
-bootstraps_foo <- cmpfun(function(density, livable, kernel, params) {
+bootstraps_foo <- cmpfun(function(density, livable, rescale, kernel, params) {
   if(params$usedisk) {
     bootstraps <- future_sapply(1:params$nboots, function(.) {
-      bootstrap <- bootstrap_foo(density, livable, kernel, params)
+      bootstrap <- bootstrap_foo(density, livable, rescale, kernel, params)
       file      <- tempfile('boot_', params$tmpdir, '.fst')
       write_fst(data.frame(bootstrap), file, compress = 0)
       gc()
       return(file)
     }, future.seed = params$seed)
   } else {
-    bootstraps <- future_replicate(params$nboots, bootstrap_foo(density, livable, kernel, params), future.seed = params$seed)
+    bootstraps <- future_replicate(params$nboots, bootstrap_foo(density, livable, rescale, kernel, params), future.seed = params$seed)
   }
-  return(bootstraps)
-})
-
-# Computes quantiles
-quantile_foo <- cmpfun(function(bootstraps, params) {
-  index <- params$nboots * params$quantile / 100
-  bootstraps <- matrix(bootstraps[order(row(bootstraps), bootstraps)], ncol = ncol(bootstraps), byrow = T)
-  bootstraps <- rowMeans(bootstraps[, c(floor(index), ceiling(index))])
   return(bootstraps)
 })
 
@@ -162,33 +172,34 @@ threshold_foo <- cmpfun(function(bootstraps, livable, params) {
   if(params$usedisk) {
     threshold <- lapply(head(seq(params$sliceindex), -1), function(i) {
       slice <- future_sapply(bootstraps, function(file) as.matrix(read_fst(file, from = params$sliceindex[i] + 1, to = params$sliceindex[i + 1])))
-      slice <- quantile_foo(slice, params)
+      slice <- rowQuantiles(slice, probs = (params$quantile / 100))
       gc()
       return(slice)
     })
     threshold <- do.call(c, threshold)
   } else {
-    threshold <- quantile_foo(bootstraps, params)
+    threshold <- rowQuantiles(bootstraps, probs = (params$quantile / 100))
   }
   threshold <- replace(as.cimg(livable), livable, threshold)
   return(threshold)
 })
 
 # Computes delineations
-delineation_foo <- cmpfun(function(density, livable, threshold, kernel) {
-  delineation <- convolve(density, kernel)
-  delineation <- as.cimg(delineation > threshold)
+delineation_foo <- cmpfun(function(density, livable, rescale, threshold, kernel) {
+  delineation <- replace(density, livable, density[livable] / rescale[livable])
+  delineation <- convolve(delineation, kernel)
   delineation <- replace(delineation, !livable, 0)
+  delineation <- as.cimg(delineation > threshold)
   return(delineation)
 })
 
 # Computes ranks
 rank_foo <- cmpfun(function(identifier) {
-    ids <- subset(identifier, identifier > 0)
-    rnk <- rank(-tabulate(ids), ties = 'first')
-    rnk <- factor(ids, seq(max(ids)), rnk)
-    rnk <- as.integer(levels(rnk))[rnk]
-    identifier <- replace(identifier, identifier > 0, rnk)
+    values     <- subset(identifier, identifier > 0)
+    position   <- rank(-tabulate(values), ties = 'first')
+    position   <- factor(values, seq(max(values)), position)
+    position   <- as.integer(levels(position))[position]
+    identifier <- replace(identifier, identifier > 0, position)
     return(identifier)
 })
 
@@ -217,43 +228,54 @@ tic('Runtime')
 
 # Urban areas data
 cat('\n- Loading data')
-reference <- raster(raster(params$density))
+reference <- raster(params$density) < 0
+kernel    <- kernel_foo(params$bandwidth)
 livable   <- read_foo(params$unlivable)
 livable   <- replace(livable, px.na(livable), 1) == 0
+livable   <- pad(livable, 2 * ceiling(params$bandwidth / 2), "xy")
 density   <- read_foo(params$density, livable)
-kernel    <- kernel_foo(params$bandwidth)
+rescale   <- replace(convolve(livable, kernel), !livable, 0)
 
 # Urban areas computations
 cat('\n- Computing urban areas:')
-params      <- optimise_foo(livable, params)                       ; cat(' bootstraps...')
-bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(' thresholds...')
-threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(' delineations...')
-delineation <- delineation_foo(density, livable, threshold, kernel); cat(' identifiers')
+params      <- optimise_foo(livable, params)                                ; cat(' bootstraps...')
+bootstraps  <- bootstraps_foo(density, livable, rescale, kernel, params)    ; cat(' thresholds...')
+threshold   <- threshold_foo(bootstraps, livable, params)                   ; cat(' delineations...')
+delineation <- delineation_foo(density, livable, rescale, threshold, kernel); cat(' identifiers')
 urban       <- identifier_foo(delineation, livable, params)
-write_foo(threshold, 'ut', reference, params)                                 
-write_foo(urban, 'ur', reference, params)
+# Writes urban areas
+write_foo(threshold, 'ut', reference, params)
+write_foo(urban, 'ur', reference, params, navalue = 0)
 unlink(dir(params$tmpdir, full.names = T), recursive = T)
 rm(bootstraps, threshold, delineation)
 
-# Urban cores data
-cat('\n- Computing urban cores:')
-livable <- imsub(urban > 0)
-density <- replace(density, !livable, 0)
+# Urban core(s) computations
+if(!exists("cores")) {
+  cores <- urban
+}
 
-# Core computations
-params      <- optimise_foo(livable, params)                       ; cat(' bootstraps...')
-bootstraps  <- bootstraps_foo(density, livable, kernel, params)    ; cat(' thresholds...')
-threshold   <- threshold_foo(bootstraps, livable, params)          ; cat(' delineations...')
-delineation <- delineation_foo(density, livable, threshold, kernel); cat(' identifiers')
-cores       <- replace(urban, !delineation, 0)
-write_foo(threshold, 'ct', reference, params)
-write_foo(cores, 'co', reference, params)
-unlink(params$tmpdir, recursive = T)
-rm(bootstraps, threshold, delineation)
-
-# Urban areas with cores computations
-cat('\n- Computing urban areas with cores\n\n')
-urbancores <- replace(urban, !(urban %in% unique(subset(urban, cores > 0))), 0)
-write_foo(urbancores, 'cc', reference, params)
+for(iter in seq(params$niter)) {
+  # Urban cores data
+  cat(sprintf('\n- Computing urban cores %i:', iter))
+  livable <- imsub(cores > 0)
+  rescale <- convolve(livable, kernel)
+  rescale <- replace(rescale, !livable, 0)
+  density <- replace(density, !livable, 0)
+  # Cores computations
+  params      <- optimise_foo(livable, params)                                ; cat(' bootstraps...')
+  bootstraps  <- bootstraps_foo(density, livable, rescale, kernel, params)    ; cat(' thresholds...')
+  threshold   <- threshold_foo(bootstraps, livable, params)                   ; cat(' delineations...')
+  delineation <- delineation_foo(density, livable, rescale, threshold, kernel); cat(' identifiers')
+  cores       <- identifier_foo(delineation, livable, params)
+  # Writes cores
+  write_foo(threshold, sprintf('ct%i', iter), reference, params)
+  write_foo(cores, sprintf('co%i', iter), reference, params, navalue = 0)
+  unlink(params$tmpdir, recursive = T)
+  rm(bootstraps, threshold, delineation)
+  # Urban areas with cores
+  sprintf('\n- Computing urban areas with cores\n\n %i', iter)
+  urbancores <- replace(urban, !(urban %in% unique(subset(urban, cores > 0))), 0)
+  write_foo(urbancores, sprintf('cc%i', iter), reference, params, navalue = 0)
+}
 
 toc()
