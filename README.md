@@ -53,8 +53,7 @@ tictoc | 1.0.0 | Measures execution time
 
 ## Usage
 
-The script `delineation.R` can be executed from the Linux or Mac Terminals or the Windows Command Prompt using the commands below. Alternatively, do-file `delineation_wrapper.do` is a wrapper to allows to execute the script `delineation.R` from Stata.
-
+The script `delineation.R` can be executed from the Linux or Mac Terminals or the Windows Command Prompt using the commands below. Alternatively, do-file `delineation_wrapper.do` is a wrapper to allows to execute the script `delineation.R` from Stata. As a example, the `input` folder of the project contains the input rasters (i.e. `density.tif` and `unlivable.tif`) for the Paris area. The instructions below computes delineations using this input data. The different output rasters can be found in the `output` folder of the project.
 
 **Linux or Mac Terminal**
 
