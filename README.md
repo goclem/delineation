@@ -21,7 +21,7 @@ Parameters | Description | Type | Default
 `density` | Path to the raster containing the values for the criterion used to compute the delineations. | Character | None
 `unlivable` | Path to the binary raster indicating the pixels that are not eligible for the bootstrap. | Character | None
 `outdir` | Path to the directory in which output rasters are written. The folder is created if it does not exist. | Character | None
-`tmpdir` | Path to the directory in which temporary files are written. The folder is created if it does not exist. **If it exists, its content is cleared upon exectution**. | Character | None
+`tmpdir` | Path to the directory in which temporary files are written. The folder is created if it does not exist. <span style="color:red">**If the folder exists, its content is cleared upon exectution**</span>. | Character | None
 `nboots` | Number of bootstrapped counterfactual densities. If the memory is insufficient, the densities are written to the temporary folder. | Integer | `100`
 `niter` | Number of iterations to produce urban cores with increasing degrees of density. | Integer | `1`
 `bandwidth` | Bandwidth (diameter) of the bi-squared smoothing kernel expressed in pixels. This value should depend on the resolution of the input rasters. | Integer | `15`
