@@ -1,4 +1,4 @@
-# Delineating urban areas using building density (21.04.26)
+# Delineating urban areas using building density (21.06.28)
 
 **Reference**: De Bellefon M.P., Combes P.P., Duranton G., Gobillon L. and Gorin C., 2019. Delineating urban areas using building density, *Journal of Urban Economics*.
 
@@ -20,9 +20,9 @@ Parameters | Description | Type | Default
 ---|---|---|---
 `density` | Path to the raster containing the values for the criterion used to compute the delineations. | Character | None
 `unlivable` | Path to the binary raster indicating the pixels that are not eligible for the bootstrap. | Character | None
-`outdir` | Path to the directory where the output rasters are written. The folder is created if it does not exist. | Character | None
-`tmpdir` | Path to the directory in where temporary files are written. The folder is created if it does not exist. If it exists, its content is **cleared** upon exectution. | Character | None
-`nboots` | Number of bootstrapped counterfactual densities. If the memory is insufficient, the densities are written in the temporary folder. | Integer | `100`
+`outdir` | Path to the directory in which output rasters are written. The folder is created if it does not exist. | Character | None
+`tmpdir` | Path to the directory in which temporary files are written. The folder is created if it does not exist. **If it exists, its content is cleared upon exectution**. | Character | None
+`nboots` | Number of bootstrapped counterfactual densities. If the memory is insufficient, the densities are written to the temporary folder. | Integer | `100`
 `niter` | Number of iterations to produce urban cores with increasing degrees of density. | Integer | `1`
 `bandwidth` | Bandwidth (diameter) of the bi-squared smoothing kernel expressed in pixels. This value should depend on the resolution of the input rasters. | Integer | `15`
 `quantile` | Cut-off percentile for the counterfacual distributions above which the density is considered to be significantly above randomness. | Integer | `95`
@@ -82,6 +82,19 @@ set Rscript="C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe"
 
 :: Executes script
 %Rscript% delineation.R --density=input\density.tif --unlivable=input\unlivable.tif --outdir=output --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
+```
+
+**Windows Power Shell**
+
+```
+# Changes the current directory (adapt path)
+cd [...]\delineation
+
+# Displays help (adapt R version)
+& "C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe" delineation.R --help
+
+# Executes script (adapt R version)
+& "C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe" delineation.R --density=input\density.tif --unlivable=input\unlivable.tif --outdir=output --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
 ```
 
 **Stata wrapper**

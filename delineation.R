@@ -78,7 +78,7 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations (version 21-04-26)\n')
+cat('\nComputes urban delineations (version 21-06-28)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
