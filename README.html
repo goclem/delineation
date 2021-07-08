@@ -1063,18 +1063,20 @@ body .markdown-body
 .highlight .vi{color:teal}
 .highlight .il{color:#009999}
 .highlight .gc{color:#999;background-color:#EAF2F5}
-</style><title>README</title></head><body><article class="markdown-body"><h1 id="delineating-urban-areas-using-building-density-210628">Delineating urban areas using building density (21.06.28)<a class="headerlink" href="#delineating-urban-areas-using-building-density-210628" title="Permanent link"></a></h1>
+</style><title>README</title></head><body><article class="markdown-body"><h1 id="delineating-urban-areas-using-building-density-210708">Delineating urban areas using building density (21.07.08)<a class="headerlink" href="#delineating-urban-areas-using-building-density-210708" title="Permanent link"></a></h1>
 <p><strong>Reference</strong>: De Bellefon M.P., Combes P.P., Duranton G., Gobillon L. and Gorin C., 2019. Delineating urban areas using building density, <em>Journal of Urban Economics</em>.</p>
 <p><strong>Contact</strong>: Clément Gorin, <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#103;&#111;&#114;&#105;&#110;&#99;&#108;&#101;&#109;&#64;&#103;&#109;&#97;&#105;&#108;&#46;&#99;&#111;&#109;">&#103;&#111;&#114;&#105;&#110;&#99;&#108;&#101;&#109;&#64;&#103;&#109;&#97;&#105;&#108;&#46;&#99;&#111;&#109;</a></p>
-<p><strong>Description</strong>: This note contains the guidelines to run the script <code>delineation.R</code> that computes urban delineations as described in the article referenced above. The script is a R executable that can be used either interactively or from the command line. The script produces the following delineations.</p>
+<p><strong>Description</strong>: This note contains the guidelines to run the scripts <code>delineation_raster.R</code> and <code>delineation_building.R</code> that compute urban delineations as described in the article referenced above. The first script computes delineation using an aggregated raster of densities as input, while the second uses a disaggregated dataset of densities (e.g. buildings). The scripts are R executables that can be used either interactively or from the command line. The scripts produce the following delineations.</p>
 <ol>
 <li>Urban areas</li>
-<li>Urban cores</li>
-<li>Urban areas with cores</li>
+<li>Urban cores (multiple)</li>
+<li>Urban areas with cores (multiple)</li>
 </ol>
 <h2 id="delineations">Delineations<a class="headerlink" href="#delineations" title="Permanent link"></a></h2>
-<p><strong>Inputs</strong>: The script takes two raster layers as inputs. The raster <code>density</code> has a single layer containing the values used to compute the delineations (e.g. building volume, population). The raster <code>unlivable</code> contains a binary layer where the pixels that are not eligible for the bootstrap take the value <code>1</code>, and <code>0</code> otherwise (e.g. rivers, mountains). Each raster should be stored in Geotiff format (i.e. <code>[file].tif</code>) with the same extent, resolution and projection. Besides, pixels located outside the area of interest (e.g. country or region borders) must have missing values, as in the example provided.</p>
-<p><strong>Outputs</strong>: The script produces several rasters whose name include the main parameters. Those names are structured as <code>[density]d[bandwidth]b[bootstraps]_[type].tif</code>. Regarding the <code>type</code>, delineations for urban areas are noted <code>*_ur.tif</code>, urban cores, <code>*_co.tif</code>, and urban areas with cores, <code>*_cc.tif</code>. Pixels belonging to the same delineation receive the same identifier, while those that are not part of a delineation have missing values. The identifiers are attributed according to the relative size of the delineations (e.g. pixels of the largest delineation take the value <code>1</code>). The script also outputs the threshold rasters used to compute urban areas (<code>*_ut.tif</code>) and cores (<code>*_ct.tif</code>).</p>
+<p><strong>Inputs</strong>: </p>
+<p>The script <code>delineation_raster.R</code> takes two raster layers as inputs. The raster <code>density</code> has a single layer containing the values used to compute the delineations (e.g. building volume, population). The raster <code>unlivable</code> contains a binary layer where the pixels that are not eligible for the bootstrap take the value <code>1</code>, and <code>0</code> otherwise (e.g. rivers, mountains). Each raster should be stored in Geotiff format (i.e. <code>[file].tif</code>) with the same extent, resolution and projection. Besides, pixels located outside the area of interest (e.g. country or region borders) must have missing values, as in the example provided.</p>
+<p>The script <code>delineation_building.R</code> takes a dataset and two raster layers as inputs. The dataset <code>density</code> is a csv file with two columns named &ldquo;density&rdquo; and &ldquo;pixel&rdquo;. The first column contains the disaggregated densities (e.g. volume of individual buildings) and the second contains the integer identifier of the raster cell in which the entity is located. The raster <code>reference</code> has a single layer containing those integer identifiers. The raster <code>unlivable</code> and the constrains on the raster format mentioned above remain the same.</p>
+<p><strong>Outputs</strong>: The scripts produce several rasters whose name include the main parameters. Those names are structured as <code>[density]d[bandwidth]b[bootstraps]_[type].tif</code>. Regarding the <code>type</code>, delineations for urban areas are noted <code>*_ur.tif</code>, urban cores, <code>*_co.tif</code>, and urban areas with cores, <code>*_cc.tif</code>. Pixels belonging to the same delineation receive the same identifier, while those that are not part of a delineation have missing values. The identifiers are attributed according to the relative size of the delineations (e.g. pixels of the largest delineation take the value <code>1</code>). The script also outputs the threshold rasters used to compute urban areas (<code>*_ut.tif</code>) and cores (<code>*_ct.tif</code>).</p>
 <table>
 <thead>
 <tr>
@@ -1082,103 +1084,126 @@ body .markdown-body
 <th>Description</th>
 <th>Type</th>
 <th>Default</th>
+<th>Script</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>density</code></td>
-<td>Path to the raster containing the values for the criterion used to compute the delineations.</td>
+<td>Path to the raster or the csv file containing the values for the criterion used to compute the delineations. See details above.</td>
 <td>Character</td>
 <td>None</td>
+<td>All</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td>Path to the raster containing the pixel identifiers. See details above.</td>
+<td>Character</td>
+<td>None</td>
+<td>Building</td>
 </tr>
 <tr>
 <td><code>unlivable</code></td>
 <td>Path to the binary raster indicating the pixels that are not eligible for the bootstrap.</td>
 <td>Character</td>
 <td>None</td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>outdir</code></td>
 <td>Path to the directory in which output rasters are written. The folder is created if it does not exist.</td>
 <td>Character</td>
 <td>None</td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>tmpdir</code></td>
-<td>Path to the directory in which temporary files are written. The folder is created if it does not exist. <span style="color:red"><strong>If the folder exists, its content is cleared upon exectution</strong></span>.</td>
+<td>Path to the directory in which temporary files are written. The folder is created if it does not exist.</td>
 <td>Character</td>
 <td>None</td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>nboots</code></td>
 <td>Number of bootstrapped counterfactual densities. If the memory is insufficient, the densities are written to the temporary folder.</td>
 <td>Integer</td>
 <td><code>100</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>niter</code></td>
 <td>Number of iterations to produce urban cores with increasing degrees of density.</td>
 <td>Integer</td>
 <td><code>1</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>bandwidth</code></td>
 <td>Bandwidth (diameter) of the bi-squared smoothing kernel expressed in pixels. This value should depend on the resolution of the input rasters.</td>
 <td>Integer</td>
 <td><code>15</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>quantile</code></td>
 <td>Cut-off percentile for the counterfacual distributions above which the density is considered to be significantly above randomness.</td>
 <td>Integer</td>
 <td><code>95</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>replace</code></td>
 <td>Controls whether the bootstrap for counterfactual densities is performed with (<code>1</code>) or without (<code>0</code>) replacement.</td>
 <td>Integer</td>
 <td><code>1</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>joinall</code></td>
 <td>Attributes the same identifier to distant delineations that are up to <code>[parameter value]</code> pixels apart using 8 connectivity.</td>
 <td>Integer</td>
 <td><code>0</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>joinunl</code></td>
 <td>Attributes the same identifier to distant delineations that are up to <code>[parameter value]</code> unlivable pixels apart using 8 connectivity.</td>
 <td>Integer</td>
 <td><code>0</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>filter</code></td>
 <td>Removes the delineations whose number of pixels is smaller than or equal to the parameter value.</td>
 <td>Integer</td>
 <td><code>0</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>workers</code></td>
 <td>Number of cores used for parallel computing. The value <code>-1</code> indicates all cores save one. Values exceeding the available cores are collapsed to <code>-1</code>.</td>
 <td>Integer</td>
 <td><code>-1</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>memory</code></td>
 <td>Amount of memory used for the computations. The value <code>-1</code> indicates all available memory. Values exceeding the available memory are collapsed to <code>-1</code>.</td>
 <td>Integer</td>
 <td><code>-1</code></td>
+<td>All</td>
 </tr>
 <tr>
 <td><code>seed</code></td>
 <td>Bootstrap seed for reproducibility.  L’Ecuyer seeds are used to ensure that the bootstraps performed in parallel are independent.</td>
 <td>Integer</td>
 <td><code>1</code></td>
+<td>All</td>
 </tr>
 </tbody>
 </table>
 <p><strong>Computations</strong>: When multiple cores are available (i.e. <code>workers</code>), computations are performed asynchronously. Forking is used on Unix machines and PSOCK on Windows, in which case the globals are identified and exported to the worker processes. The recommended amount of memory available for computations is 2 GB per worker (i.e. <code>memory</code>). Depending on the size of the input data, the number of bootstraps and the operation system, the computations may exceed the available memory. In this case, temporary files are written to the temporary folder (i.e. <code>tmpdir</code>), which should be located on a SSD drive to speed up read and write operations. For computational efficiency, all functions are pre-compiled.</p>
-<p><strong>Requirements</strong>: The required packages are automatically installed upon execution when they are missing. You may need to run the script with administrator rights the first time.</p>
+<p><strong>Requirements</strong>: The scripts were written using 4.0.3. The required packages are automatically installed upon execution when they are missing. You may need to run the script with administrator rights the first time.</p>
 <table>
 <thead>
 <tr>
@@ -1189,14 +1214,14 @@ body .markdown-body
 </thead>
 <tbody>
 <tr>
-<td>R</td>
-<td>4.0.3</td>
-<td>R language</td>
-</tr>
-<tr>
 <td>compiler</td>
 <td>4.0.3</td>
 <td>Byte code compiler</td>
+</tr>
+<tr>
+<td>data.table</td>
+<td>1.13.2</td>
+<td>Two-dimensional structures</td>
 </tr>
 <tr>
 <td>fst</td>
@@ -1241,16 +1266,18 @@ body .markdown-body
 </tbody>
 </table>
 <h2 id="usage">Usage<a class="headerlink" href="#usage" title="Permanent link"></a></h2>
-<p>The script <code>delineation.R</code> can be executed from the Linux or Mac Terminals or the Windows Command Prompt using the commands below. Alternatively, do-file <code>delineation_wrapper.do</code> is a wrapper to allows to execute the script <code>delineation.R</code> from Stata. As a example, the <code>input</code> folder of the project contains the input rasters (i.e. <code>density.tif</code> and <code>unlivable.tif</code>) for the Paris area. The instructions below computes delineations using this input data. The different output rasters can be found in the <code>output</code> folder of the project.</p>
+<p>The scripts <code>delineation_raster.R</code> and <code>delineation_building.R</code> can be executed from the Linux or Mac Terminals or the Windows Command Prompt using the commands below. Alternatively, do-file <code>delineation_wrappers.do</code> is a wrapper to allows to execute the scripts using Stata. As a example, the <code>input</code> folder of the project contains the inputs for the two types of delineation for the Paris area. The instructions below compute the delineations using this input. The different output rasters can be found in the <code>output</code> folder of the project.</p>
 <p><strong>Linux or Mac Terminal</strong></p>
 <div class="highlight"><pre># Changes the current directory (adapt path)
 cd [...]/delineation
 
-# Displays help
-Rscript delineation.R --help
+# Delineation from raster
+Rscript delineation_raster.R --help
+Rscript delineation_raster.R --density=input/raster/density.tif --unlivable=input/raster/unlivable.tif --outdir=output/raster --tmpdir=temporary --nboots=1000 --bandwidth=15 --quantile=95
 
-# Executes script
-Rscript delineation.R --density=input/density.tif --unlivable=input/unlivable.tif --outdir=output --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
+# Delineation from building
+Rscript delineation_building.R --help
+Rscript delineation_building.R --density=input/building/density.csv --reference=input/building/reference.tif --unlivable=input/building/unlivable.tif --outdir=output/building --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
 </pre></div>
 
 <p><strong>Windows Command Prompt</strong></p>
@@ -1260,37 +1287,44 @@ cd [...]\delineation
 :: Declares Rscript as a local or global variable (adapt R version). The Rscript.exe environment variable is not defined by default on Windows
 set Rscript=&quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot;
 
-:: Displays help
-%Rscript% delineation.R --help
+:: Delineation from raster
+%Rscript% delineation_raster.R --help
+%Rscript% delineation_raster.R --density=input\raster\density.tif --unlivable=input\raster\unlivable.tif --outdir=output\raster --tmpdir=temporary --nboots=1000 --bandwidth=15 --quantile=95
 
-:: Executes script
-%Rscript% delineation.R --density=input\density.tif --unlivable=input\unlivable.tif --outdir=output --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
+:: Delineation from building
+%Rscript% delineation_building.R --help
+%Rscript% delineation_building.R --density=input\building\density.csv --reference=input\building\reference.tif --unlivable=input\building\unlivable.tif --outdir=output\building --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
+</pre></div>
+
+<p><strong>Stata wrappers</strong></p>
+<div class="highlight"><pre>* Declares Rscript as a global variable (adapt R version)
+global Rscript &quot;/usr/local/bin/Rscript&quot;                         // Linux or Mac
+global Rscript &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; // Windows
+
+* Changes the current directory (adapt path)
+cd [...]/delineation
+
+* Sources wrappers
+quietly do delineation_wrappers.do
+
+* Delineation from raster
+delineation_raster, help
+delineation_raster, density(&quot;input/raster/density.tif&quot;) unlivable(&quot;input/raster/unlivable.tif&quot;) outdir(&quot;output/raster&quot;) tmpdir(&quot;temporary&quot;) nboots(1000) bandwidth(15) quantile(95)
+
+* Delineation from buildings
+delineation_building, help
+delineation_building, density(&quot;input/building/density.csv&quot;) reference(&quot;input/building/reference.tif&quot;) unlivable(&quot;input/building/unlivable.tif&quot;) outdir(&quot;output/building&quot;) tmpdir(&quot;temporary&quot;) nboots(100) bandwidth(15) quantile(95)
 </pre></div>
 
 <p><strong>Windows Power Shell</strong></p>
 <div class="highlight"><pre># Changes the current directory (adapt path)
 cd [...]\delineation
 
-# Displays help (adapt R version)
-&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation.R --help
+# Delineation from raster (adapt R version)
+&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation_raster.R --help
+&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation_raster.R --density=input\raster\density.tif --unlivable=input\raster\unlivable.tif --outdir=output\raster --tmpdir=temporary --nboots=1000 --bandwidth=15 --quantile=95
 
-# Executes script (adapt R version)
-&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation.R --density=input\density.tif --unlivable=input\unlivable.tif --outdir=output --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
-</pre></div>
-
-<p><strong>Stata wrapper</strong></p>
-<div class="highlight"><pre>* Declares Rscript as a global variable (adapt R version)
-global Rscript &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot;
-
-* Changes the current directory (adapt path)
-cd [...]/delineation
-
-* Sources wrapper
-quietly do delineation_wrapper.do
-
-* Displays help
-delineation, help
-
-* Executes script
-delineation, density(&quot;input/density.tif&quot;) unlivable(&quot;input/unlivable.tif&quot;) outdir(&quot;output&quot;) tmpdir(&quot;temporary&quot;) nboots(100) bandwidth(15) quantile(95)
+* Delineation from buildings (adapt R version)
+&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation_building.R --help
+&amp; &quot;C:\Program Files\R\R-4.0.3\bin\x64\Rscript.exe&quot; delineation_building.R --density=input\building\density.csv --reference=input\building\reference.tif --unlivable=input\building\unlivable.tif --outdir=output\building --tmpdir=temporary --nboots=100 --bandwidth=15 --quantile=95
 </pre></div></article></body></html>
