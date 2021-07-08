@@ -266,10 +266,10 @@ urban       <- identifier_foo(delineation, livable, params)
 # Writes urban areas
 write_foo(threshold, 'ut', params)
 write_foo(urban, 'ur', params, navalue = 0)
-rm(bootstraps, threshold, delineation)
 if(params$usedisk) {
   unlink(bootstraps, recursive = T)  
 }
+rm(bootstraps, threshold, delineation)
 
 # Urban core(s) computations
 if(!exists("cores")) {
@@ -297,10 +297,10 @@ for(iter in seq(params$niter)) {
   # Writes cores
   write_foo(threshold, sprintf('ct%i', iter), params)
   write_foo(cores, sprintf('co%i', iter), params, navalue = 0)
-  rm(bootstraps, threshold, delineation)
   if(params$usedisk) {
     unlink(bootstraps, recursive = T)  
   }
+  rm(bootstraps, threshold, delineation)
   
   # Urban areas with cores
   cat(sprintf('\n- Computing urban areas with cores %i\n\n', iter))
