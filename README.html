@@ -1063,15 +1063,16 @@ body .markdown-body
 .highlight .vi{color:teal}
 .highlight .il{color:#009999}
 .highlight .gc{color:#999;background-color:#EAF2F5}
-</style><title>README</title></head><body><article class="markdown-body"><h1 id="delineating-urban-areas-using-building-density-210708">Delineating urban areas using building density (21.07.08)<a class="headerlink" href="#delineating-urban-areas-using-building-density-210708" title="Permanent link"></a></h1>
-<p><strong>Reference</strong>: De Bellefon M.P., Combes P.P., Duranton G., Gobillon L. and Gorin C., 2019. Delineating urban areas using building density, <em>Journal of Urban Economics</em>.</p>
+</style><title>README</title></head><body><article class="markdown-body"><h1 id="delineating-urban-areas-using-building-density-version-20211026">Delineating urban areas using building density (version 2021.10.26)<a class="headerlink" href="#delineating-urban-areas-using-building-density-version-20211026" title="Permanent link"></a></h1>
+<p><strong>Reference</strong>: De Bellefon MP., PP. Combes, G. Duranton, L. Gobillon and C. Gorin. Delineating urban areas using building density, <em>Journal of Urban Economics</em>, 2019.</p>
 <p><strong>Contact</strong>: Clément Gorin, <a href="&#109;&#97;&#105;&#108;&#116;&#111;&#58;&#103;&#111;&#114;&#105;&#110;&#99;&#108;&#101;&#109;&#64;&#103;&#109;&#97;&#105;&#108;&#46;&#99;&#111;&#109;">&#103;&#111;&#114;&#105;&#110;&#99;&#108;&#101;&#109;&#64;&#103;&#109;&#97;&#105;&#108;&#46;&#99;&#111;&#109;</a></p>
-<p><strong>Description</strong>: This note contains the guidelines to run the scripts <code>delineation_raster.R</code> and <code>delineation_building.R</code> that compute urban delineations as described in the article referenced above. The first script computes delineation using an aggregated raster of densities as input, while the second uses a disaggregated dataset of densities (e.g. buildings). The scripts are R executables that can be used either interactively or from the command line. The scripts produce the following delineations.</p>
+<p><strong>Description</strong>: This note contains the guidelines to run the scripts <code>delineation_raster.R</code> and <code>delineation_building.R</code> that compute urban delineations as described in the article referenced above. The first script computes delineation using a raster of aggregated densities as input, while the second uses a disaggregated dataset of densities (e.g. buildings). Both scripts are R executables that can be used either interactively or from the command line to produce the following delineations.</p>
 <ol>
 <li>Urban areas</li>
 <li>Urban cores (multiple)</li>
 <li>Urban areas with cores (multiple)</li>
 </ol>
+<p><strong>Update 2021.10.26</strong>: This implementation computes counterfactual densities for urban cores more consistently than in the original version. Specifically, two separate sets of bootstraps are performed. As before, the intensities covered by urban areas are bootstrapped inside the urban areas. By constrast, the intensities located within a radius of half a smoothing kernel from the urban areas are bootstrapped within that zone, and no longer have a zero value. This allows the smoothing function to operate on more realistic counterfactual densities at the edges of urban areas. Note that for small urban areas, this methodology may produce fewer cores than the original version.</p>
 <h2 id="delineations">Delineations<a class="headerlink" href="#delineations" title="Permanent link"></a></h2>
 <p><strong>Inputs</strong>: </p>
 <p>The script <code>delineation_raster.R</code> takes two raster layers as inputs. The raster <code>density</code> has a single layer containing the values used to compute the delineations (e.g. building volume, population). The raster <code>unlivable</code> contains a binary layer where the pixels that are not eligible for the bootstrap take the value <code>1</code>, and <code>0</code> otherwise (e.g. rivers, mountains). Each raster should be stored in Geotiff format (i.e. <code>[file].tif</code>) with the same extent, resolution and projection. Besides, pixels located outside the area of interest (e.g. country or region borders) must have missing values, as in the example provided.</p>
@@ -1174,7 +1175,7 @@ body .markdown-body
 </tr>
 <tr>
 <td><code>filter</code></td>
-<td>Removes the delineations whose number of pixels is smaller than or equal to the parameter value.</td>
+<td>Removes the delineations whose number of pixels is smaller than or equal to <code>[parameter value]</code>.</td>
 <td>Integer</td>
 <td><code>0</code></td>
 <td>All</td>
@@ -1202,7 +1203,7 @@ body .markdown-body
 </tr>
 </tbody>
 </table>
-<p><strong>Computations</strong>: When multiple cores are available (i.e. <code>workers</code>), computations are performed asynchronously. Forking is used on Unix machines and PSOCK on Windows, in which case the globals are identified and exported to the worker processes. The recommended amount of memory available for computations is 2 GB per worker (i.e. <code>memory</code>). Depending on the size of the input data, the number of bootstraps and the operation system, the computations may exceed the available memory. In this case, temporary files are written to the temporary folder (i.e. <code>tmpdir</code>), which should be located on a SSD drive to speed up read and write operations. For computational efficiency, all functions are pre-compiled.</p>
+<p><strong>Computations</strong>: When multiple cores are available (i.e. <code>workers</code>), computations are performed asynchronously. Forking is used on Unix machines and PSOCK on Windows, in which case the globals are identified and exported to the worker processes. The recommended amount of memory available for computations is 2 GB per worker (i.e. <code>memory</code>). Depending on the size of the input data, the number of bootstraps and the operating system, the computations may exceed the available memory. In this case, temporary files are written to the temporary folder (i.e. <code>tmpdir</code>), which should be located on a SSD drive to speed up read and write operations. For computational efficiency, all functions are pre-compiled.</p>
 <p><strong>Requirements</strong>: The scripts were written using 4.0.3. The required packages are automatically installed upon execution when they are missing. You may need to run the script with administrator rights the first time.</p>
 <table>
 <thead>

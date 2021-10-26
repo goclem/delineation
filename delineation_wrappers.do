@@ -3,7 +3,7 @@
 # Description: Stata wrappers for the delineation scripts
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Updated: 08 July 2021
+# Version: 2021.10.26
 */
 
 * Wrapper for delineation_raster.R

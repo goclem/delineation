@@ -2,7 +2,7 @@
 # Description: Computes urban delineations from buildings
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Updated: 08 July 2021
+# Version: 2021.10.26
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
@@ -33,8 +33,8 @@ params <- parse_args(OptionParser(usage = 'Computes urban delineations from buil
 params <- subset(params, names(params) != 'help')
 
 # (!) Testing only --------------------------------------------------------
-# setwd("~/Desktop/delineation")
-# # Parameters
+# setwd('~/Desktop/delineation')
+# # Interactive
 # params <- modifyList(params, list(
 #   density   = 'input/building/density.csv',
 #   reference = 'input/building/reference.tif',
@@ -82,7 +82,7 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations from buildings (version 21-07-08)\n')
+cat('\nComputes urban delineations from buildings (version 2021.10.26)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
@@ -103,7 +103,7 @@ read_foo <- cmpfun(function(file, livable = NULL) {
   image <- raster(file)
   image <- as.cimg(image, maxpixels = ncell(image))
   if(!is.null(livable)) {
-    image <- pad(image, 2 * ceiling(params$bandwidth / 2), "xy")
+    image <- pad(image, 2 * ceiling(params$bandwidth / 2), 'xy')
     image <- replace(image, !livable, 0)
   }
   return(image)
@@ -119,7 +119,7 @@ filename_foo <- cmpfun(function(label, params) {
 # Writes cimg as raster
 write_foo <- cmpfun(function(image, label, params, navalue = -1) {
   container <- raster(params$reference) < 0
-  image     <- crop.borders(image, nPix = floor((params$bandwidth + 1) / 2))
+  image     <- crop.borders(image, nPix = ((nrow(image) - ncol(container)) / 2))
   image     <- setValues(container, c(image))
   image     <- mask(image, container)
   filename  <- filename_foo(label, params)
@@ -157,29 +157,58 @@ match_image <- function(density, reference, livable) {
 }
 
 # Computes single bootstrap
-bootstrap_foo <- cmpfun(function(density_b, reference, livable, rescale, kernel, params) {
+bootstrap_foo <- cmpfun(function(density_b, reference, livable, kernel, params) {
   bootstrap <- copy(density_b)
   bootstrap[, pixel := sample(reference[livable], .N, params$replace)]
   bootstrap <- bootstrap[, .(density = sum(density)), by = pixel]
   bootstrap <- match_image(bootstrap, reference, livable)
-  bootstrap <- replace(bootstrap, livable, bootstrap[livable] / rescale[livable])
   bootstrap <- convolve(bootstrap, kernel)
   bootstrap <- subset(bootstrap, livable)
   return(bootstrap)
 })
 
+# Computes single bootstrap for cores
+bootstrap_cores_foo <- cmpfun(function(density_b1, density_b2, reference, livable1, livable2, kernel, params) {
+  bootstrap1 <- copy(density_b1)
+  bootstrap2 <- copy(density_b2)
+  bootstrap1[, pixel := sample(reference[livable1], .N, params$replace)]
+  bootstrap2[, pixel := sample(reference[livable2], .N, params$replace)]
+  bootstrap1 <- match_image(bootstrap1, reference, livable1)
+  bootstrap2 <- match_image(bootstrap2, reference, livable2)
+  bootstrap  <- bootstrap1 + bootstrap2
+  bootstrap  <- convolve(bootstrap, kernel)
+  bootstrap  <- subset(bootstrap, livable)
+  return(bootstrap)
+})
+
 # Computes multiple bootstraps
-bootstraps_foo <- cmpfun(function(density_b, reference, livable, rescale, kernel, params) {
+bootstraps_foo <- cmpfun(function(density_b, reference, livable, kernel, params) {
   if(params$usedisk) {
     bootstraps <- future_sapply(1:params$nboots, function(.) {
-      bootstrap <- bootstrap_foo(density_b, reference, livable, rescale, kernel, params)
+      bootstrap <- bootstrap_foo(density_b, reference, livable, kernel, params)
       file      <- tempfile('boot_', params$tmpdir, '.fst')
       write_fst(data.frame(bootstrap), file, compress = 0)
       gc()
       return(file)
     }, future.seed = params$seed)
   } else {
-    bootstraps <- future_replicate(params$nboots, bootstrap_foo(density_b, reference, livable, rescale, kernel, params), future.seed = params$seed)
+    bootstraps <- future_replicate(params$nboots, bootstrap_foo(density_b, reference, livable, kernel, params), future.seed = params$seed)
+  }
+  return(bootstraps)
+})
+
+# Computes multiple bootstraps for cores
+bootstraps_cores_foo <- cmpfun(function(density_b1, density_b2, reference, livable1, livable2, kernel, params) {
+  if(params$usedisk) {
+    bootstraps <- future_sapply(1:params$nboots, function(.) {
+      bootstrap <- bootstrap_cores_foo(density_b1, density_b2, reference, livable1, livable2, kernel, params)
+      file      <- tempfile('boot_', params$tmpdir, '.fst')
+      write_fst(data.frame(bootstrap), file, compress = 0)
+      gc()
+      return(file)
+    }, future.seed = params$seed)
+  } else {
+    bootstraps <- future_replicate(params$nboots, bootstrap_cores_foo(density_b1, density_b2, reference, livable1, livable2, kernel, params), future.seed = params$seed)
   }
   return(bootstraps)
 })
@@ -196,15 +225,14 @@ threshold_foo <- cmpfun(function(bootstraps, livable, params) {
     threshold <- do.call(c, threshold)
   } else {
     threshold <- rowQuantiles(bootstraps, probs = (params$quantile / 100))
-  }
+  } 
   threshold <- replace(as.cimg(livable), livable, threshold)
   return(threshold)
 })
 
 # Computes delineations
-delineation_foo <- cmpfun(function(density_r, livable, rescale, threshold, kernel) {
-  delineation <- replace(density_r, livable, density_r[livable] / rescale[livable])
-  delineation <- convolve(delineation, kernel)
+delineation_foo <- cmpfun(function(density_r, livable, threshold, kernel) {
+  delineation <- convolve(density_r, kernel)
   delineation <- replace(delineation, !livable, 0)
   delineation <- as.cimg(delineation > threshold)
   return(delineation)
@@ -212,12 +240,11 @@ delineation_foo <- cmpfun(function(density_r, livable, rescale, threshold, kerne
 
 # Computes ranks
 rank_foo <- cmpfun(function(identifier) {
-    values     <- subset(identifier, identifier > 0)
-    position   <- rank(-tabulate(values), ties = 'first')
-    position   <- factor(values, seq(max(values)), position)
-    position   <- as.integer(levels(position))[position]
-    identifier <- replace(identifier, identifier > 0, position)
-    return(identifier)
+  values     <- subset(identifier, identifier > 0)
+  position   <- rank(-tabulate(values), ties = 'first')
+  position   <- position[match(values, seq(max(values)))]
+  identifier <- replace(identifier, identifier > 0, position)
+  return(identifier)
 })
 
 # Computes identifiers
@@ -239,7 +266,7 @@ identifier_foo <- cmpfun(function(delineation, livable, params) {
   return(identifier)
 })
 
-# Computations ------------------------------------------------------------
+# Urban areas -------------------------------------------------------------
 
 tic('Runtime')
 
@@ -249,64 +276,66 @@ kernel    <- kernel_foo(params$bandwidth)
 livable   <- read_foo(params$unlivable)
 livable   <- replace(livable, px.na(livable), 1) == 0
 livable   <- pad(livable, 2 * ceiling(params$bandwidth / 2), "xy")
-rescale   <- replace(convolve(livable, kernel), !livable, 0)
 reference <- read_foo(params$reference, livable)
 density_b <- fread(params$density)
 density_b <- density_b[pixel %in% reference[livable]]
 density_r <- match_image(density_b, reference, livable)
 
 # Urban areas computations
-cat('\n- Computing urban areas:')
-params      <- optimise_foo(livable, params)                                         ; cat(' bootstraps...')
-bootstraps  <- bootstraps_foo(density_b, reference, livable, rescale, kernel, params); cat(' thresholds...')
-threshold   <- threshold_foo(bootstraps, livable, params)                            ; cat(' delineations...')
-delineation <- delineation_foo(density_r, livable, rescale, threshold, kernel)       ; cat(' identifiers')
-urban       <- identifier_foo(delineation, livable, params)
+params      <- optimise_foo(livable, params); cat(' bootstraps...')
+bootstraps  <- bootstraps_foo(density_b, reference, livable, kernel, params); cat(' thresholds...')
+threshold   <- threshold_foo(bootstraps, livable, params); cat(' delineations...')
+delineation <- delineation_foo(density_r, livable, threshold, kernel); cat(' identifiers...')
+urban       <- identifier_foo(delineation, livable, params); cat(' saving')
 
 # Writes urban areas
 write_foo(threshold, 'ut', params)
 write_foo(urban, 'ur', params, navalue = 0)
-if(params$usedisk) {
-  unlink(bootstraps, recursive = T)  
-}
+if(params$usedisk) unlink(bootstraps, recursive = T)
 rm(bootstraps, threshold, delineation)
 
-# Urban core(s) computations
-if(!exists("cores")) {
-  cores <- urban
-}
+# Urban cores -------------------------------------------------------------
+
+# Reference delineation
+previous <- urban
 
 for(iter in seq(params$niter)) {
+  # First iteration is not indexed
+  corelab <- ifelse(iter == 1, '', as.character(iter))
   
   # Urban cores data
-  cat(sprintf('\n- Computing urban cores %i:', iter))
-  livable   <- imsub(cores > 0)
-  rescale   <- convolve(livable, kernel)
-  rescale   <- replace(rescale, !livable, 0)
-  reference <- replace(reference, !livable, 0)
-  density_r <- replace(density_r, !livable, 0)
-  density_b <- density_b[pixel %in% reference[livable]]
-    
+  cat('\n- Computing urban cores: data...')
+  livable1   <- previous > 0
+  livable2   <- convolve(livable1, kernel) > 0 
+  livable2   <- replace(livable2, !livable | livable1, F)
+  livable    <- livable1 | livable2
+  density_r  <- replace(density_r, !livable, 0)
+  density_b1 <- density_b[pixel %in% reference[livable1]]
+  density_b2 <- density_b[pixel %in% reference[livable2]]
+  
   # Cores computations
-  params      <- optimise_foo(livable, params)                                         ; cat(' bootstraps...')
-  bootstraps  <- bootstraps_foo(density_b, reference, livable, rescale, kernel, params); cat(' thresholds...')
-  threshold   <- threshold_foo(bootstraps, livable, params)                            ; cat(' delineations...')
-  delineation <- delineation_foo(density_r, livable, rescale, threshold, kernel)       ; cat(' identifiers')
-  cores       <- identifier_foo(delineation, livable, params)
+  params      <- optimise_foo(livable, params); cat(' bootstraps...')
+  bootstraps  <- bootstraps_cores_foo(density_b1, density_b2, reference, livable1, livable2, kernel, params); cat(' thresholds...')
+  threshold   <- threshold_foo(bootstraps, livable, params); cat(' delineations...')
+  delineation <- delineation_foo(density_r, livable, threshold, kernel); cat(' identifiers...')
+  delineation <- replace(delineation, previous == 0, 0)
+  cores       <- identifier_foo(delineation, livable, params); cat(' saving')
   
   # Writes cores
-  write_foo(threshold, sprintf('ct%i', iter), params)
-  write_foo(cores, sprintf('co%i', iter), params, navalue = 0)
-  if(params$usedisk) {
-    unlink(bootstraps, recursive = T)  
-  }
-  rm(bootstraps, threshold, delineation)
+  write_foo(threshold, sprintf('ct%s', corelab), params)
+  write_foo(cores, sprintf('co%s', corelab), params, navalue = 0)
+  if(params$usedisk) unlink(bootstraps, recursive = T)
+  rm(bootstraps, threshold, delineation, density_b1, density_b2, livable1, livable2)
   
   # Urban areas with cores
-  cat(sprintf('\n- Computing urban areas with cores %i\n\n', iter))
-  urbancores <- replace(urban, !(urban %in% unique(subset(urban, cores > 0))), 0)
-  write_foo(urbancores, sprintf('cc%i', iter), params, navalue = 0)
-
+  cat('\n- Computing urban areas with cores\n\n')
+  urbancores <- urban %in% unique(subset(urban, cores > 0))
+  urbancores <- replace(urban, !urbancores, 0)
+  write_foo(urbancores, sprintf('cc%s', corelab), params, navalue = 0)
+  rm(corelab)
+  
+  # Updates reference
+  previous <- cores
 }
 
 toc()

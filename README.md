@@ -1,14 +1,16 @@
-# Delineating urban areas using building density (21.07.08)
+# Delineating urban areas using building density (version 2021.10.26)
 
-**Reference**: De Bellefon M.P., Combes P.P., Duranton G., Gobillon L. and Gorin C., 2019. Delineating urban areas using building density, *Journal of Urban Economics*.
+**Reference**: De Bellefon MP., PP. Combes, G. Duranton, L. Gobillon and C. Gorin. Delineating urban areas using building density, *Journal of Urban Economics*, 2019.
 
 **Contact**: Clément Gorin, gorinclem@gmail.com
 
-**Description**: This note contains the guidelines to run the scripts `delineation_raster.R` and `delineation_building.R` that compute urban delineations as described in the article referenced above. The first script computes delineation using an aggregated raster of densities as input, while the second uses a disaggregated dataset of densities (e.g. buildings). The scripts are R executables that can be used either interactively or from the command line. The scripts produce the following delineations.
+**Description**: This note contains the guidelines to run the scripts `delineation_raster.R` and `delineation_building.R` that compute urban delineations as described in the article referenced above. The first script computes delineation using a raster of aggregated densities as input, while the second uses a disaggregated dataset of densities (e.g. buildings). Both scripts are R executables that can be used either interactively or from the command line to produce the following delineations.
 
 1. Urban areas
 2. Urban cores (multiple)
 3. Urban areas with cores (multiple)
+
+**Update 2021.10.26**: This implementation computes counterfactual densities for urban cores more consistently than in the original version. Specifically, two separate sets of bootstraps are performed. As before, the intensities covered by urban areas are bootstrapped inside the urban areas. By constrast, the intensities located within a radius of half a smoothing kernel from the urban areas are bootstrapped within that zone, and no longer have a zero value. This allows the smoothing function to operate on more realistic counterfactual densities at the edges of urban areas. Note that for small urban areas, this methodology may produce fewer cores than the original version.
 
 ## Delineations
 
@@ -34,12 +36,12 @@ Parameters | Description | Type | Default | Script
 `replace` | Controls whether the bootstrap for counterfactual densities is performed with (`1`) or without (`0`) replacement. | Integer | `1` | All
 `joinall` | Attributes the same identifier to distant delineations that are up to `[parameter value]` pixels apart using 8 connectivity. | Integer | `0` | All
 `joinunl` | Attributes the same identifier to distant delineations that are up to `[parameter value]` unlivable pixels apart using 8 connectivity. | Integer | `0` | All
-`filter` | Removes the delineations whose number of pixels is smaller than or equal to the parameter value. | Integer | `0` | All
+`filter` | Removes the delineations whose number of pixels is smaller than or equal to `[parameter value]`. | Integer | `0` | All
 `workers` | Number of cores used for parallel computing. The value `-1` indicates all cores save one. Values exceeding the available cores are collapsed to `-1`. | Integer | `-1` | All
 `memory` | Amount of memory used for the computations. The value `-1` indicates all available memory. Values exceeding the available memory are collapsed to `-1`. | Integer |  `-1` | All
 `seed` | Bootstrap seed for reproducibility.  L’Ecuyer seeds are used to ensure that the bootstraps performed in parallel are independent. | Integer | `1` | All
 
-**Computations**: When multiple cores are available (i.e. `workers`), computations are performed asynchronously. Forking is used on Unix machines and PSOCK on Windows, in which case the globals are identified and exported to the worker processes. The recommended amount of memory available for computations is 2 GB per worker (i.e. `memory`). Depending on the size of the input data, the number of bootstraps and the operation system, the computations may exceed the available memory. In this case, temporary files are written to the temporary folder (i.e. `tmpdir`), which should be located on a SSD drive to speed up read and write operations. For computational efficiency, all functions are pre-compiled.
+**Computations**: When multiple cores are available (i.e. `workers`), computations are performed asynchronously. Forking is used on Unix machines and PSOCK on Windows, in which case the globals are identified and exported to the worker processes. The recommended amount of memory available for computations is 2 GB per worker (i.e. `memory`). Depending on the size of the input data, the number of bootstraps and the operating system, the computations may exceed the available memory. In this case, temporary files are written to the temporary folder (i.e. `tmpdir`), which should be located on a SSD drive to speed up read and write operations. For computational efficiency, all functions are pre-compiled.
 
 **Requirements**: The scripts were written using 4.0.3. The required packages are automatically installed upon execution when they are missing. You may need to run the script with administrator rights the first time.
 
