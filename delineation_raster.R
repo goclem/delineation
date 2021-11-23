@@ -2,7 +2,7 @@
 # Description: Computes urban delineations from raster
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Version: 2021.10.26
+# Version: 2021.11.23
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
@@ -32,7 +32,7 @@ params <- parse_args(OptionParser(usage = 'Computes urban delineations from rast
 params <- subset(params, names(params) != 'help')
 
 # (!) Testing only --------------------------------------------------------
-# setwd('~/Desktop/delineation')
+# setwd('~/github/delineation')
 # # Interactive
 # params <- modifyList(params, list(
 #   density   = 'input/raster/density.tif',
@@ -79,7 +79,7 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations from raster (version 2021.10.26)\n')
+cat('\nComputes urban delineations from raster (version 2021.11.23)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
@@ -100,7 +100,7 @@ read_foo <- cmpfun(function(file, livable = NULL) {
   image <- raster(file)
   image <- as.cimg(image, maxpixels = ncell(image))
   if(!is.null(livable)) {
-    image <- pad(image, 2 * ceiling(params$bandwidth / 2), 'xy')
+    image <- pad(image, (nrow(livable) - nrow(image)), 'xy')
     image <- replace(image, !livable, 0)
   }
   return(image)
