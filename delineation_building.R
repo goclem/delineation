@@ -158,7 +158,6 @@ match_image <- function(density, reference, livable) {
 
 # Computes single bootstrap
 bootstrap_foo <- cmpfun(function(density_b, reference, livable, kernel, params) {
-  set.seed(1)
   bootstrap <- copy(density_b)
   bootstrap[, pixel := sample(reference[livable], .N, params$replace)]
   bootstrap <- match_image(bootstrap, reference, livable)
