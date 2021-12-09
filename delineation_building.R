@@ -2,7 +2,7 @@
 # Description: Computes urban delineations from buildings
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Version: 2021.10.26
+# Version: 2021.12.09
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
@@ -82,7 +82,7 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations from buildings (version 2021.10.26)\n')
+cat('\nComputes urban delineations from buildings (version 2021.12.09)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
@@ -158,9 +158,9 @@ match_image <- function(density, reference, livable) {
 
 # Computes single bootstrap
 bootstrap_foo <- cmpfun(function(density_b, reference, livable, kernel, params) {
+  set.seed(1)
   bootstrap <- copy(density_b)
   bootstrap[, pixel := sample(reference[livable], .N, params$replace)]
-  bootstrap <- bootstrap[, .(density = sum(density)), by = pixel]
   bootstrap <- match_image(bootstrap, reference, livable)
   bootstrap <- convolve(bootstrap, kernel)
   bootstrap <- subset(bootstrap, livable)
