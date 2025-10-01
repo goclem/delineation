@@ -2,11 +2,11 @@
 # Description: Computes urban delineations from buildings
 # Author: Clement Gorin
 # Contact: gorinclem@gmail.com
-# Version: 2021.12.09
+# Version: 2025.10.01
 
 # Packages
 suppressMessages(if(!require('pacman')) install.packages('pacman', repos = 'https://cloud.r-project.org/'))
-pacman::p_load(compiler, data.table, fst, future.apply, imager, matrixStats, memuse, optparse, raster, rgdal, tictoc)
+pacman::p_load(compiler, data.table, fst, future.apply, imager, matrixStats, memuse, optparse, raster, tictoc)
 options(warn = -1, future.globals.maxSize = (2048 * 1024^2))
 
 # Parameters
@@ -33,14 +33,14 @@ params <- parse_args(OptionParser(usage = 'Computes urban delineations from buil
 params <- subset(params, names(params) != 'help')
 
 # (!) Testing only --------------------------------------------------------
-# setwd('~/Desktop/delineation')
+# setwd('~/Dropbox/github/delineation')
 # # Interactive
 # params <- modifyList(params, list(
 #   density   = 'input/building/density.csv',
 #   reference = 'input/building/reference.tif',
 #   unlivable = 'input/building/unlivable.tif',
-#   outdir    = 'output/building',
-#   tmpdir    = 'temporary'
+#   outdir    = '~/Desktop/outputs',
+#   tmpdir    = '~/Desktop/temporary'
 #   ))
 # # Command line
 # cat(paste(c('Rscript', 'delineation_building.R', paste0('--', names(params), '=', params)), collapse =  ' '))
@@ -82,12 +82,12 @@ params$memory  <- ifelse(params$memory  == -1, maxmem, min(params$memory,  maxme
 rm(maxcor, maxmem)
 
 # Prints parameters
-cat('\nComputes urban delineations from buildings (version 2021.12.09)\n')
+cat('\nComputes urban delineations from buildings (version 2025.10.01)\n')
 cat('\nParameters:', sprintf('- %-10s= %s', names(params), unlist(params)), sep = '\n')
 
 # Sets up workers
 cat('\nOperations:\n- Optimising computations')
-plan(multiprocess, workers = params$workers, gc = T)
+plan(multisession, workers = params$workers, gc = T)
 
 # Functions ---------------------------------------------------------------
 
